@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clinical Heritage — Silsilah Klinis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070c17; --panel:#101b30; --panel-edge:#050810;
+    --cyan:#4cc9f0; --cyan-dim:#2a5a78; --amber:#ffd166; --alert:#ef476f; --mint:#06d6a0; --violet:#b892ff;
+    --text:#eaf2f8; --text-dim:#7e8fae;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; min-height:100%; background:var(--bg); font-family:'Space Mono', monospace; color:var(--text); display:flex; align-items:flex-start; justify-content:center; }
+  .console{ position:relative; width:100%; max-width:680px; margin:24px; background:var(--panel); border:4px solid var(--panel-edge); box-shadow:0 0 0 4px #16233d, 0 20px 60px rgba(0,0,0,0.6); overflow:hidden; }
+  .topbar{ display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--panel-edge); border-bottom:3px solid #16233d; flex-wrap:wrap; gap:6px; }
+  .brand{ font-family:'Press Start 2P', monospace; font-size:9.5px; color:var(--cyan); line-height:1.6; }
+  .phase-tag{ font-family:'Press Start 2P', monospace; font-size:8px; color:var(--violet); background:rgba(184,146,255,0.1); border:1px solid var(--violet); padding:4px 6px; }
+  .game-timer{ font-family:'Press Start 2P', monospace; font-size:8px; color:var(--amber); background:rgba(255,209,102,0.08); border:1px solid var(--amber); padding:4px 6px; white-space:nowrap; }
+  .game-timer.low{ color:var(--alert); border-color:var(--alert); background:rgba(239,71,111,0.14); animation:pulseLow 1s ease-in-out infinite; }
+  @keyframes pulseLow{ 0%,100%{ opacity:1;} 50%{ opacity:0.5;} }
+
+  .status-bar{ display:flex; justify-content:space-between; padding:8px 14px; background:#0c1526; border-bottom:3px solid #16233d; font-size:10px; color:var(--text-dim); flex-wrap:wrap; gap:4px; }
+  .status-bar b{ color:var(--amber); }
+
+  .stage{ padding:16px 12px 20px; min-height:480px; }
+
+  .intro-title{ font-family:'Press Start 2P', monospace; font-size:13px; text-align:center; color:var(--cyan); margin-bottom:14px; line-height:1.9; }
+  .intro-body{ font-size:12px; line-height:1.9; color:var(--text-dim); margin-bottom:14px; }
+  .intro-body b{ color:var(--text); }
+  .phase-box{ background:#0c1526; border:2px solid #16233d; padding:12px 14px; margin-bottom:12px; font-size:11px; line-height:1.8; }
+  .phase-box .ptitle{ font-family:'Press Start 2P', monospace; font-size:9px; display:block; margin-bottom:6px; }
+  .rule-box{ background:#0c1526; border:2px solid #16233d; padding:12px 14px; margin-bottom:14px; font-size:10.5px; line-height:1.9; }
+  .rule-box .rmove{ display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid #16233d; }
+  .rule-box .rmove:last-child{ border-bottom:none; }
+  .rule-box .rmove b{ color:var(--amber); text-align:right; }
+  .difficulty-note{ background:rgba(239,71,111,0.07); border:2px dashed var(--alert); padding:10px 12px; font-size:10.5px; color:#ffb8c6; margin-bottom:14px; line-height:1.8; }
+  .start-btn{ width:100%; font-family:'Press Start 2P', monospace; font-size:12px; background:var(--cyan); color:#04222e; border:none; padding:15px; cursor:pointer; }
+
+  /* ===== FASE DEDUKSI: pohon keluarga (4 generasi, render rekursif) ===== */
+  .tree-wrap{ overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
+  .tree{ display:flex; justify-content:center; min-width:1320px; padding:4px; }
+  .branch{ display:flex; flex-direction:column; align-items:center; margin:0 7px; position:relative; }
+  .couple-row{ display:flex; align-items:center; gap:4px; }
+  .link-heart{ color:var(--cyan-dim); font-size:11px; }
+  .drop-stub{ width:2px; height:10px; background:var(--cyan-dim); }
+  .children-row{ display:flex; gap:8px; padding-top:10px; border-top:2px solid var(--cyan-dim); position:relative; }
+  .children-row > .branch{ padding-top:0; }
+  .children-row > .branch::before{ content:""; position:absolute; top:-10px; left:50%; width:2px; height:10px; background:var(--cyan-dim); transform:translateX(-50%); }
+
+  .node{ width:48px; min-height:66px; background:#132238; border:2px solid var(--cyan-dim); border-radius:5px; display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:3px 1px 4px; cursor:pointer; user-select:none; }
+  .node .avatar{ font-size:16px; color:var(--cyan-dim); line-height:1; margin-top:1px; }
+  .node .nrole{ font-size:5.5px; color:var(--text-dim); text-align:center; line-height:1.25; }
+  .node .nname{ font-size:6.5px; color:var(--text); text-align:center; line-height:1.25; font-weight:700; min-height:9px; }
+  .node.selected{ border-color:var(--amber); box-shadow:0 0 0 2px var(--amber); }
+  .node.filled{ border-color:var(--cyan); }
+  .node.correct{ border-color:var(--mint); box-shadow:0 0 0 2px var(--mint); }
+  .node.wrong{ border-color:var(--alert); box-shadow:0 0 0 2px var(--alert); }
+
+  .pool-wrap{ margin-bottom:12px; }
+  .pool-label{ font-size:10px; color:var(--text-dim); margin-bottom:6px; }
+  .pool-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pool-chip{ background:#132238; border:2px solid var(--cyan-dim); color:var(--text); font-family:'Space Mono', monospace; font-size:10px; padding:6px 9px; cursor:pointer; }
+  .pool-chip.selected{ border-color:var(--amber); background:rgba(255,209,102,0.12); color:var(--amber); }
+  .pool-empty{ font-size:10px; color:var(--text-dim); font-style:italic; }
+
+  .grid-hint{ text-align:center; font-size:10px; color:var(--text-dim); min-height:16px; margin-bottom:10px; }
+  .grid-hint b{ color:var(--amber); }
+
+  .clue-toggle-btn{ width:100%; font-family:'Space Mono', monospace; font-size:10.5px; background:#132238; color:var(--cyan); border:2px solid var(--cyan-dim); padding:10px; cursor:pointer; margin-bottom:10px; }
+  .clue-panel{ background:#0c1526; border:2px solid #16233d; padding:10px; margin-bottom:12px; max-height:320px; overflow-y:auto; }
+  .clue-card{ background:#132238; border-left:3px solid var(--cyan); padding:8px 10px; margin-bottom:8px; font-size:10px; line-height:1.7; }
+  .clue-card:last-child{ margin-bottom:0; }
+  .clue-card .ctitle{ display:block; font-size:8.5px; color:var(--cyan); margin-bottom:3px; font-weight:700; }
+  .clue-card.hard{ border-left-color:var(--alert); }
+  .clue-card.hard .ctitle{ color:var(--alert); }
+
+  .check-btn{ width:100%; font-family:'Press Start 2P', monospace; font-size:11px; background:var(--mint); color:#04231a; border:none; padding:13px; cursor:pointer; margin-top:4px; }
+  .check-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .feedback-box{ display:none; background:#0c1526; border-left:3px solid var(--cyan); padding:10px 12px; font-size:11px; color:var(--text-dim); line-height:1.7; margin-bottom:12px; }
+
+  /* ===== FASE MEMORIZE ===== */
+  .memorize-note{ background:rgba(76,201,240,0.06); border:2px dashed var(--cyan); padding:10px 12px; font-size:10.5px; color:var(--cyan); margin-bottom:12px; line-height:1.7; }
+  .dossier-box{ display:none; background:#0c1526; border:2px solid var(--amber); padding:12px; margin-bottom:12px; font-size:11px; line-height:1.9; }
+  .dossier-box .dname{ font-family:'Press Start 2P', monospace; font-size:11px; color:var(--amber); display:block; margin-bottom:6px; }
+  .dossier-box ul{ margin:0; padding-left:16px; }
+  .advance-btn{ width:100%; font-family:'Press Start 2P', monospace; font-size:11px; background:var(--amber); color:#3a2a04; border:none; padding:13px; cursor:pointer; margin-top:6px; }
+
+  /* ===== FASE RECALL ===== */
+  .q-box{ background:#0c1526; border:2px solid #16233d; padding:14px; margin-bottom:14px; font-size:12px; line-height:1.7; }
+  .q-box .qtag{ font-family:'Press Start 2P', monospace; font-size:8.5px; display:block; margin-bottom:8px; color:var(--violet); }
+  .opt-btn{ display:block; width:100%; text-align:left; background:#132238; border:2px solid var(--cyan-dim); color:var(--text); font-family:'Space Mono', monospace; font-size:11px; line-height:1.5; padding:11px 12px; margin-bottom:8px; cursor:pointer; }
+  .opt-btn:hover{ background:#1a2c4a; }
+  .opt-btn:disabled{ pointer-events:none; }
+  .opt-btn .ol{ font-family:'Press Start 2P', monospace; font-size:10px; color:var(--amber); margin-right:8px; }
+  .opt-btn.correct{ border-color:var(--mint); background:rgba(6,214,160,0.18); color:var(--mint); }
+  .opt-btn.wrong{ border-color:var(--alert); background:rgba(239,71,111,0.18); color:#ffb8c6; }
+
+  /* ===== HASIL ===== */
+  .result-screen{ text-align:center; padding:10px 4px; }
+  .trophy{ font-size:44px; margin-bottom:10px; }
+  .result-title{ font-family:'Press Start 2P', monospace; font-size:14px; color:var(--mint); line-height:1.8; margin-bottom:14px; }
+  .result-stats{ background:#0c1526; border:2px solid #16233d; padding:14px; margin:14px 0; font-size:11px; line-height:2; text-align:left; }
+  .result-stats b{ color:var(--amber); }
+  .restart-btn{ width:100%; font-family:'Press Start 2P', monospace; font-size:11px; background:var(--mint); color:#04231a; border:none; padding:13px; cursor:pointer; }
+
+  footer.note{ font-size:9px; color:var(--text-dim); text-align:center; padding:10px; border-top:3px solid #16233d; background:var(--panel-edge); line-height:1.7; }
+</style>
+</head>
+<body>
+
+<div class="console">
+  <div class="topbar">
+    <div class="brand">🧬 CLINICAL HERITAGE<br><span style="color:var(--text-dim); font-size:7px;">SILSILAH KLINIS — HARD MODE</span></div>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <div class="game-timer" id="gameTimerBadge" style="display:none;">⏳ 20:00</div>
+      <div class="phase-tag" id="phaseTag">PROTOTYPE v2</div>
+    </div>
+  </div>
+  <div class="status-bar" id="statusBar"><span>Susun ulang silsilah 4 generasi dari rekam farmasi klinis</span></div>
+  <div class="stage" id="stage"></div>
+  <footer class="note">prototype mini-game · v0.2 (hard mode) · 4 generasi · 24 anggota keluarga · 23 kartu petunjuk · 30 soal recall · geser layar ke samping untuk melihat seluruh pohon</footer>
+</div>
+
+<script>
+/* ==================================================================
+   CLINICAL HERITAGE — SILSILAH KLINIS (HARD MODE)
+   4 generasi (Buyut → Anak/Menantu → Cucu/Menantu → Cicit), 24 orang.
+   Beberapa penyakit SENGAJA dibuat mirip antar cabang keluarga yang
+   berbeda (mis. 2 kasus Gastritis, 2 kasus Hipertensi dengan obat
+   berbeda) sebagai jebakan — pemain harus membaca detail obat/alergi
+   dengan teliti, bukan hanya nama penyakitnya. Ada pula sepasang anak
+   kembar yang hanya bisa dibedakan lewat 2 kartu petunjuk berantai.
+   ================================================================== */
+
+const PEOPLE = {
+  wiryosentiko:{ name:"Wiryosentiko", gender:"L", clinis:["Hipertensi kronis (riwayat >20 tahun)","Rutin: Amlodipin 10mg","Alergi: Penisilin"] },
+  ngatinah:    { name:"Ngatinah",    gender:"P", clinis:["Diabetes Melitus Tipe 2","Rutin: Glibenklamid","Riwayat Osteoporosis (pernah patah tulang panggul)"] },
+
+  sudarmo:{ name:"Sudarmo", gender:"L", clinis:["Hipertensi (menurun dari ayah)","Rutin: Amlodipin 10mg"] },
+  wartini:{ name:"Wartini", gender:"P", clinis:["Rheumatoid Arthritis","Rutin: Metotreksat (mingguan)","Alergi: Sulfa"] },
+  martini:{ name:"Martini", gender:"P", clinis:["Diabetes Melitus Tipe 2 (menurun dari ibu)","Rutin: Metformin 500mg"] },
+  sarno:  { name:"Sarno",   gender:"L", clinis:["Gastritis kronis","Rutin: Omeprazole 20mg","Alergi: Aspirin"] },
+  slamet: { name:"Slamet",  gender:"L", clinis:["Asma sejak muda","Rutin: Inhaler Salbutamol","Alergi: Penisilin (menurun dari ayah)"] },
+  painem: { name:"Painem",  gender:"P", clinis:["Hipotiroid","Rutin: Levotiroksin"] },
+
+  budi:   { name:"Budi",   gender:"L", clinis:["Hipertensi (menurun dari ayah Sudarmo)","Rutin: Amlodipin 10mg","Rheumatoid Arthritis ringan (menurun dari ibu Wartini)","Rutin tambahan: Metotreksat dosis rendah"] },
+  rina:   { name:"Rina",   gender:"P", clinis:["Migrain kronis","Rutin: Sumatriptan bila kambuh","Alergi: Kodein"] },
+  dewi:   { name:"Dewi",   gender:"P", clinis:["Rheumatoid Arthritis (menurun dari ibu Wartini)","Rutin: Metotreksat"] },
+  hasan:  { name:"Hasan",  gender:"L", clinis:["Gastritis kronis (kondisi pribadi, bukan turunan)","Rutin: Antasida","Alergi: Aspirin"] },
+  yanto:  { name:"Yanto",  gender:"L", clinis:["Diabetes Melitus Tipe 2 (menurun dari ibu Martini)","Rutin: Metformin 500mg"] },
+  wulan:  { name:"Wulan",  gender:"P", clinis:["Anemia Defisiensi Besi","Rutin: Tablet Fe (Sulfas Ferosus)"] },
+  ika:    { name:"Ika",    gender:"P", clinis:["Gastritis kronis (menurun dari ayah Sarno)","Rutin: Omeprazole 20mg","Alergi: Aspirin (menurun dari ayah)"] },
+  siti:   { name:"Siti",   gender:"P", clinis:["Asma (menurun dari ayah Slamet)","Rutin: Inhaler Salbutamol"] },
+  bambang:{ name:"Bambang",gender:"L", clinis:["Hipertensi (kondisi pribadi, bukan turunan)","Rutin: Candesartan"] },
+  agus:   { name:"Agus",   gender:"L", clinis:["Hipotiroid (menurun dari ibu Painem)","Rutin: Levotiroksin"] },
+
+  ratna:  { name:"Ratna",  gender:"P", clinis:["Migrain kronis (menurun dari ibu Rina)","Rutin: Sumatriptan bila kambuh","Alergi: Kodein (menurun dari ibu Rina)"] },
+  rani:   { name:"Rani",   gender:"P", clinis:["Migrain kronis (menurun dari ibu Rina)","Rutin: Sumatriptan bila kambuh","Kembar — lahir 10 menit lebih dulu dari saudarinya"] },
+  fajar:  { name:"Fajar",  gender:"L", clinis:["Rheumatoid Arthritis ringan (menurun dari ibu Dewi)","Kontrol rutin ke rheumatologi"] },
+  lintang:{ name:"Lintang",gender:"P", clinis:["Gastritis (menurun dari ayah Hasan)","Rutin: Antasida bila perlu"] },
+  reno:   { name:"Reno",   gender:"L", clinis:["Anemia Defisiensi Besi (menurun dari ibu Wulan)","Rutin: Tablet Fe"] },
+  nadia:  { name:"Nadia",  gender:"P", clinis:["Asma ringan (menurun dari ibu Siti)","Kadang pakai Inhaler Salbutamol"] }
+};
+
+// Struktur pohon 4 generasi (posisi & hubungan SUDAH diketahui pemain lewat tampilan);
+// hanya identitas (correct) yang harus ditebak lewat kartu petunjuk.
+const SLOTS = {
+  buyutK:      { role:"BUYUT",              gender:"L", correct:"wiryosentiko" },
+  buyutN:      { role:"BUYUT",              gender:"P", correct:"ngatinah" },
+
+  anakA:       { role:"ANAK-A",             gender:"L", correct:"sudarmo" },
+  menantuA:    { role:"MENANTU-A",          gender:"P", correct:"wartini" },
+  anakB:       { role:"ANAK-B",             gender:"P", correct:"martini" },
+  menantuB:    { role:"MENANTU-B",          gender:"L", correct:"sarno" },
+  anakC:       { role:"ANAK-C",             gender:"L", correct:"slamet" },
+  menantuC:    { role:"MENANTU-C",          gender:"P", correct:"painem" },
+
+  anakA1:      { role:"CUCU-A1",            gender:"L", correct:"budi" },
+  menantuA1:   { role:"MTN CUCU-A1",        gender:"P", correct:"rina" },
+  anakA2:      { role:"CUCU-A2",            gender:"P", correct:"dewi" },
+  menantuA2:   { role:"MTN CUCU-A2",        gender:"L", correct:"hasan" },
+  anakB1:      { role:"CUCU-B1",            gender:"L", correct:"yanto" },
+  menantuB1:   { role:"MTN CUCU-B1",        gender:"P", correct:"wulan" },
+  anakB2:      { role:"CUCU-B2 (lajang)",   gender:"P", correct:"ika" },
+  anakC1:      { role:"CUCU-C1",            gender:"P", correct:"siti" },
+  menantuC1:   { role:"MTN CUCU-C1",        gender:"L", correct:"bambang" },
+  anakC2:      { role:"CUCU-C2 (lajang)",   gender:"L", correct:"agus" },
+
+  cucuA1a:     { role:"CICIT-A1a",          gender:"P", correct:"ratna" },
+  cucuA1b:     { role:"CICIT-A1b",          gender:"P", correct:"rani" },
+  cucuA2a:     { role:"CICIT-A2a",          gender:"L", correct:"fajar" },
+  cucuA2b:     { role:"CICIT-A2b",          gender:"P", correct:"lintang" },
+  cucuB1:      { role:"CICIT-B1",           gender:"L", correct:"reno" },
+  cucuC1:      { role:"CICIT-C1",           gender:"P", correct:"nadia" }
+};
+
+// Struktur relasi pohon (hanya slot id — dipakai untuk render rekursif)
+const TREE = {
+  slot:"buyutK", spouseSlot:"buyutN",
+  children:[
+    { slot:"anakA", spouseSlot:"menantuA", children:[
+        { slot:"anakA1", spouseSlot:"menantuA1", children:[ {slot:"cucuA1a"}, {slot:"cucuA1b"} ] },
+        { slot:"anakA2", spouseSlot:"menantuA2", children:[ {slot:"cucuA2a"}, {slot:"cucuA2b"} ] }
+      ] },
+    { slot:"anakB", spouseSlot:"menantuB", children:[
+        { slot:"anakB1", spouseSlot:"menantuB1", children:[ {slot:"cucuB1"} ] },
+        { slot:"anakB2" }
+      ] },
+    { slot:"anakC", spouseSlot:"menantuC", children:[
+        { slot:"anakC1", spouseSlot:"menantuC1", children:[ {slot:"cucuC1"} ] },
+        { slot:"anakC2" }
+      ] }
+  ]
+};
+
+const CLUES = [
+  { title:"Rekam Kartu Keluarga Tertua", text:"<b>Wiryosentiko</b> (kepala keluarga, Hipertensi kronis >20 tahun, rutin Amlodipin 10mg, Alergi Penisilin) tercatat menikah dengan <b>Ngatinah</b> (Diabetes Melitus Tipe 2, rutin Glibenklamid, riwayat Osteoporosis)." },
+  { title:"Wawancara Farmasis — Sudarmo (Laki-laki)", text:"<b>Sudarmo</b> mengidap Hipertensi yang diturunkan langsung dari ayahnya, rutin Amlodipin — sama seperti riwayat pengobatan ayahnya selama lebih dari 20 tahun." },
+  { title:"Wawancara Farmasis — Wartini (Perempuan, menantu)", text:"<b>Wartini</b> mengidap Rheumatoid Arthritis, rutin Metotreksat mingguan, Alergi Sulfa. Tercatat sebagai istri sah Sudarmo." },
+  { title:"Wawancara Farmasis — Martini (Perempuan)", text:"<b>Martini</b> mengidap Diabetes Melitus Tipe 2, menurun langsung dari ibunya, rutin Metformin 500mg." },
+  { title:"Wawancara Farmasis — Sarno (Laki-laki, menantu)", text:"<b>Sarno</b> mengidap Gastritis kronis, rutin Omeprazole 20mg, Alergi Aspirin. Tercatat sebagai suami sah Martini." },
+  { title:"Wawancara Farmasis — Slamet (Laki-laki)", text:"<b>Slamet</b> mengidap Asma sejak muda, rutin Inhaler Salbutamol, dan memiliki Alergi Penisilin yang sama persis dengan riwayat ayahnya." },
+  { title:"Wawancara Farmasis — Painem (Perempuan, menantu)", text:"<b>Painem</b> mengidap Hipotiroid, rutin Levotiroksin. Tercatat sebagai istri sah Slamet." },
+  { title:"Rekam Kesehatan — Budi (Laki-laki, sudah menikah)", text:"<b>Budi</b> mewarisi DUA kondisi sekaligus dari kedua orang tuanya: Hipertensi (rutin Amlodipin, seperti garis ayahnya) dan Rheumatoid Arthritis ringan (rutin Metotreksat dosis rendah, seperti ibunya)." },
+  { title:"Rekam Kesehatan — Rina (Perempuan, menantu)", text:"<b>Rina</b> mengidap Migrain kronis, rutin Sumatriptan bila kambuh, dan Alergi Kodein. Tercatat sebagai istri sah Budi." },
+  { title:"Rekam Kesehatan — Dewi (Perempuan, sudah menikah)", text:"<b>Dewi</b> mengidap Rheumatoid Arthritis (menurun dari ibunya) namun TIDAK memiliki riwayat Hipertensi seperti kakaknya." },
+  { title:"Rekam Kesehatan — Hasan (Laki-laki, menantu)", text:"<b>Hasan</b> mengidap Gastritis kronis, rutin Antasida, Alergi Aspirin. Tercatat sebagai suami sah Dewi. Catatan farmasis: kondisi ini murni pribadi, bukan turunan — dan BERBEDA dari kasus Gastritis lain di keluarga ini karena Hasan TIDAK rutin Omeprazole." },
+  { title:"Rekam Kesehatan — Yanto (Laki-laki, sudah menikah)", text:"<b>Yanto</b> mengidap Diabetes Melitus Tipe 2, menurun dari ibunya, rutin Metformin 500mg." },
+  { title:"Rekam Kesehatan — Wulan (Perempuan, menantu)", text:"<b>Wulan</b> mengidap Anemia Defisiensi Besi, rutin Tablet Fe (Sulfas Ferosus). Tercatat sebagai istri sah Yanto." },
+  { title:"Rekam Kesehatan — Ika (Perempuan, belum menikah)", text:"<b>Ika</b> mengidap Gastritis kronis yang menurun dari ayahnya, rutin Omeprazole 20mg, dan Alergi Aspirin yang juga menurun dari ayahnya. Ika belum menikah." },
+  { title:"Rekam Kesehatan — Siti (Perempuan, sudah menikah)", text:"<b>Siti</b> mengidap Asma, menurun dari ayahnya, rutin Inhaler Salbutamol." },
+  { title:"Rekam Kesehatan — Bambang (Laki-laki, menantu)", text:"<b>Bambang</b> mengidap Hipertensi (kondisi pribadi, bukan turunan keluarga ini), namun rutin Candesartan — BERBEDA dengan obat Hipertensi lain di keluarga ini yang memakai Amlodipin. Tercatat sebagai suami sah Siti." },
+  { title:"Rekam Kesehatan — Agus (Laki-laki, belum menikah)", text:"<b>Agus</b> mengidap Hipotiroid, menurun dari ibunya, rutin Levotiroksin. Agus belum menikah." },
+  { title:"Rekam Kesehatan Generasi Keempat — Fajar (Laki-laki)", text:"<b>Fajar</b> mengidap Rheumatoid Arthritis ringan, menurun dari ibunya, dan rutin kontrol ke rheumatologi." },
+  { title:"Rekam Kesehatan Generasi Keempat — Lintang (Perempuan)", text:"<b>Lintang</b> adalah adik kandung Fajar, dengan riwayat Gastritis yang menurun dari ayahnya, rutin Antasida bila perlu." },
+  { title:"Rekam Kesehatan Generasi Keempat — Reno (Laki-laki, anak tunggal)", text:"<b>Reno</b> mengidap Anemia Defisiensi Besi, menurun dari ibunya, rutin Tablet Fe." },
+  { title:"Rekam Kesehatan Generasi Keempat — Nadia (Perempuan, anak tunggal)", text:"<b>Nadia</b> mengidap Asma ringan, menurun dari ibunya, sesekali menggunakan Inhaler Salbutamol." },
+  { title:"⚠ Kartu Sulit — Anak Kembar Budi &amp; Rina (1/2)", text:"Budi dan Rina memiliki sepasang anak kembar perempuan. Salah satunya, yang lahir 10 menit lebih dulu, bernama <b>Rani</b>.", hard:true },
+  { title:"⚠ Kartu Sulit — Anak Kembar Budi &amp; Rina (2/2)", text:"Catatan tambahan: salah satu dari anak kembar Budi &amp; Rina mewarisi Migrain SEKALIGUS Alergi Kodein persis seperti ibunya — namun ia BUKAN anak yang lahir lebih dulu. (Gabungkan dengan kartu sebelumnya untuk menentukan siapa dia!)", hard:true }
+];
+
+const RECALL_QUESTIONS = [
+  { q:"Siapa nama Buyut Kakek dalam keluarga ini?", options:['Sarno', 'Slamet', 'Wiryosentiko', 'Sudarmo'], correct:2 },
+  { q:"Obat rutin apa yang dikonsumsi Ngatinah?", options:['Levotiroksin', 'Metformin', 'Amlodipin', 'Glibenklamid'], correct:3 },
+  { q:"Siapa istri dari Sudarmo?", options:['Painem', 'Martini', 'Rina', 'Wartini'], correct:3 },
+  { q:"Penyakit apa yang diturunkan dari Wiryosentiko ke Sudarmo?", options:['Hipertensi', 'Gastritis', 'Diabetes', 'Asma'], correct:0 },
+  { q:"Siapa suami dari Martini?", options:['Hasan', 'Bambang', 'Slamet', 'Sarno'], correct:3 },
+  { q:"Alergi obat apa yang dimiliki Slamet, sama seperti ayahnya?", options:['Sulfa', 'Aspirin', 'Penisilin', 'Kodein'], correct:2 },
+  { q:"Sebutkan DUA kondisi kesehatan yang diwarisi Budi dari kedua orang tuanya!", options:['Hipotiroid & Anemia', 'Gastritis & Migrain', 'Hipertensi (dari Sudarmo) & Rheumatoid Arthritis (dari Wartini)', 'Diabetes & Asma'], correct:2 },
+  { q:"Siapa istri dari Budi?", options:['Rina', 'Siti', 'Dewi', 'Wulan'], correct:0 },
+  { q:"Mengapa Gastritis pada Hasan TIDAK dianggap sebagai penyakit turunan keluarga ini?", options:['Karena Hasan adalah menantu, bukan keturunan darah keluarga ini', 'Karena Hasan tidak pernah ke dokter', 'Karena Hasan alergi Penisilin', 'Karena Hasan anak tunggal'], correct:0 },
+  { q:"Siapa cucu dari Ngatinah yang mengidap Diabetes Melitus Tipe 2?", options:['Yanto', 'Siti', 'Agus', 'Budi'], correct:0 },
+  { q:"Obat rutin apa yang dikonsumsi Wulan untuk Anemia Defisiensi Besi-nya?", options:['Omeprazole', 'Tablet Fe (Sulfas Ferosus)', 'Levotiroksin', 'Metformin'], correct:1 },
+  { q:"Siapa anggota keluarga yang belum menikah dari garis keturunan Martini-Sarno?", options:['Wulan', 'Ika', 'Yanto', 'Agus'], correct:1 },
+  { q:"Ika mewarisi Gastritis dan Alergi Aspirin dari siapa?", options:['Ibunya, Martini', 'Ayahnya, Sarno', 'Kakeknya, Wiryosentiko', 'Suaminya'], correct:1 },
+  { q:"Ada 2 kasus Gastritis dalam keluarga ini (Ika dan Lintang). Siapa di antara keduanya yang JUGA memiliki Alergi Aspirin?", options:['Keduanya', 'Tidak ada', 'Ika', 'Lintang'], correct:2 },
+  { q:"Siapa istri dari Bambang?", options:['Siti', 'Ika', 'Dewi', 'Nadia'], correct:0 },
+  { q:"Mengapa obat Hipertensi Bambang (Candesartan) berbeda dari garis keturunan Sudarmo (Amlodipin)?", options:['Karena Candesartan lebih murah', 'Karena Bambang alergi Amlodipin', 'Karena Bambang juga punya Diabetes', 'Karena Hipertensi Bambang adalah kondisi pribadi, bukan turunan keluarga ini'], correct:3 },
+  { q:"Siapa anggota keluarga yang belum menikah dari garis keturunan Slamet-Painem?", options:['Siti', 'Agus', 'Bambang', 'Nadia'], correct:1 },
+  { q:"Agus mewarisi Hipotiroid dari siapa?", options:['Ayahnya, Slamet', 'Kakaknya, Siti', 'Ibunya, Painem', 'Neneknya, Ngatinah'], correct:2 },
+  { q:"Siapa nama kedua anak kembar dari Budi dan Rina?", options:['Reno dan Nadia', 'Ratna dan Rani', 'Fajar dan Lintang', 'Siti dan Ika'], correct:1 },
+  { q:"Di antara Ratna dan Rani, siapa yang lahir lebih dulu?", options:['Ratna', 'Keduanya lahir bersamaan', 'Tidak diketahui', 'Rani'], correct:3 },
+  { q:"Di antara Ratna dan Rani, siapa yang memiliki Alergi Kodein?", options:['Ratna', 'Tidak ada', 'Keduanya', 'Rani'], correct:0 },
+  { q:"Fajar mewarisi kondisi apa dari ibunya, Dewi?", options:['Migrain', 'Gastritis', 'Hipertensi', 'Rheumatoid Arthritis ringan'], correct:3 },
+  { q:"Lintang mewarisi Gastritis dari siapa?", options:['Ibunya, Dewi', 'Bibinya, Ika', 'Kakeknya, Sarno', 'Ayahnya, Hasan'], correct:3 },
+  { q:"Siapa anak tunggal dari pasangan Yanto dan Wulan?", options:['Reno', 'Agus', 'Nadia', 'Fajar'], correct:0 },
+  { q:"Siapa anak tunggal dari pasangan Siti dan Bambang?", options:['Ika', 'Lintang', 'Nadia', 'Reno'], correct:2 },
+  { q:"Sebutkan rantai 3 generasi yang mewarisi kondisi Asma secara berurutan!", options:['Wiryosentiko → Sudarmo → Budi', 'Wartini → Budi → Fajar', 'Slamet → Siti → Nadia', 'Sarno → Ika → Lintang'], correct:2 },
+  { q:"Sebutkan rantai keturunan Rheumatoid Arthritis, dimulai dari menantu yang pertama kali mengidapnya!", options:['Wiryosentiko → Sudarmo → Budi', 'Wartini → Budi & Dewi → Fajar', 'Painem → Agus → Nadia', 'Sarno → Ika → Lintang'], correct:1 },
+  { q:"Berapa generasi jarak antara Wiryosentiko (Buyut) dan Nadia?", options:['1 generasi', '3 generasi', '2 generasi', '4 generasi'], correct:1 },
+  { q:"Reno rutin Tablet Fe untuk Anemia-nya. Jika ia perlu antibiotik golongan Tetrasiklin, apa yang perlu diperhatikan apoteker?", options:['Dosis Tablet Fe harus digandakan', 'Zat besi dapat mengikat Tetrasiklin & menurunkan penyerapan keduanya — jangan diminum bersamaan', 'Tidak ada interaksi sama sekali', 'Tetrasiklin harus dihentikan permanen'], correct:1 },
+  { q:"Budi rutin Amlodipin & Metotreksat dosis rendah. Golongan pereda nyeri OTC apa yang sebaiknya DIHINDARI karena berisiko meningkatkan toksisitas Metotreksat?", options:['Golongan NSAID (misal Ibuprofen)', 'Antasida', 'Parasetamol', 'Vitamin B kompleks'], correct:0 },
+];
+
+const GAME_TIME_SECONDS = 20 * 60; // fase memorize: 20 menit
+let gameTimer = null, gameTimeLeft = GAME_TIME_SECONDS;
+
+let assignments = {};
+let selectedName = null;
+let cluePanelOpen = false;
+let wrongChecksDeduksi = 0;
+
+let recallIdx = 0, recallScore = 0, recallAnswered = 0;
+let memorizeBonus = 0;
+
+const stage = document.getElementById('stage');
+function setPhaseTag(t){ document.getElementById('phaseTag').textContent = t; }
+function shuffleArr(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+let shuffledPoolOrder = shuffleArr(Object.keys(PEOPLE));
+
+/* ============================================================ RENDER POHON (rekursif) */
+function renderBranch(node, nodeHtmlFn){
+  let inner = nodeHtmlFn(node.slot);
+  if (node.spouseSlot){
+    inner = `<div class="couple-row">${inner}<span class="link-heart">⚭</span>${nodeHtmlFn(node.spouseSlot)}</div>`;
+  }
+  let childHtml = '';
+  if (node.children && node.children.length){
+    childHtml = `<div class="drop-stub"></div><div class="children-row">${node.children.map(c=>`<div class="branch">${renderBranch(c, nodeHtmlFn)}</div>`).join('')}</div>`;
+  }
+  return inner + childHtml;
+}
+function renderTreeHtml(nodeHtmlFn){
+  return `<div class="tree-wrap"><div class="tree"><div class="branch">${renderBranch(TREE, nodeHtmlFn)}</div></div></div>`;
+}
+
+/* ============================================================ INTRO */
+function renderIntro(){
+  setPhaseTag('PROTOTYPE v2');
+  document.getElementById('statusBar').innerHTML = `<span>Susun ulang silsilah 4 generasi dari rekam farmasi klinis</span>`;
+  stage.innerHTML = `
+    <div class="intro-title">🧬 CLINICAL HERITAGE<br><span style="font-size:10px; color:var(--text-dim);">SILSILAH KLINIS — HARD MODE</span></div>
+    <div class="intro-body">
+      Versi ini memuat <b>4 generasi keluarga besar (24 orang)</b>: Buyut → Anak &amp; Menantu →
+      Cucu &amp; Menantu Cucu → Cicit. Beberapa kasus klinis SENGAJA dibuat mirip di cabang keluarga
+      berbeda (dua kasus Gastritis, dua kasus Hipertensi dengan obat berbeda) sebagai jebakan —
+      baca detail obat &amp; alergi dengan teliti, jangan hanya nama penyakitnya.
+    </div>
+    <div class="difficulty-note">
+      ⚠ Ada satu kasus yang butuh <b style="color:#fff;">2 kartu petunjuk digabung</b>: sepasang anak kembar
+      yang hanya bisa dibedakan lewat urutan lahir + riwayat alergi. Baca semua kartu sebelum menempatkan!
+    </div>
+    <div class="phase-box"><span class="ptitle" style="color:var(--cyan);">FASE 1 — DEDUKSI</span>Tempatkan 24 nama ke posisi yang benar dalam pohon keluarga 4 generasi menggunakan 23 kartu petunjuk berbasis data farmasi klinis.</div>
+    <div class="phase-box"><span class="ptitle" style="color:var(--amber);">FASE 2 — MEMORIZE (20 menit)</span>Setelah susunan benar, pohon keluarga lengkap beserta seluruh data klinis tiap anggota ditampilkan. Pelajari &amp; hafalkan sebaik mungkin.</div>
+    <div class="phase-box"><span class="ptitle" style="color:var(--violet);">FASE 3 — RECALL (30 soal)</span>Pohon keluarga disembunyikan. Jawab 30 soal — mulai dari relasi keluarga, rantai penyakit turunan lintas generasi, hingga reasoning interaksi obat.</div>
+    <div class="rule-box">
+      <div class="rmove"><span>Jawaban benar (Recall)</span><b>+10 / soal</b></div>
+      <div class="rmove"><span>Sisa waktu memorize (jika lanjut lebih awal)</span><b>+1 / menit</b></div>
+      <div class="rmove"><span>Cek susunan yang masih salah (Deduksi)</span><b>-5 / percobaan</b></div>
+    </div>
+    <button class="start-btn" id="startBtn">MULAI FASE DEDUKSI</button>
+  `;
+  document.getElementById('startBtn').addEventListener('click', startDeduksi);
+}
+
+/* ============================================================ FASE 1: DEDUKSI */
+function startDeduksi(){
+  assignments = {};
+  selectedName = null;
+  cluePanelOpen = false;
+  wrongChecksDeduksi = 0;
+  setPhaseTag('FASE 1 · DEDUKSI');
+  renderDeduksi();
+}
+function poolNames(){
+  const used = new Set(Object.values(assignments));
+  return shuffledPoolOrder.filter(id => !used.has(id));
+}
+
+function renderDeduksi(hintOverride){
+  const totalSlots = Object.keys(SLOTS).length;
+  const filledCount = Object.keys(assignments).length;
+  document.getElementById('statusBar').innerHTML = `<span>Silsilah terisi: <b>${filledCount}</b>/${totalSlots}</span><span>Cek salah: <b>${wrongChecksDeduksi}</b>x</span>`;
+
+  const nodeHtmlDeduksi = (slotId)=>{
+    const slot = SLOTS[slotId];
+    const personId = assignments[slotId];
+    const person = personId ? PEOPLE[personId] : null;
+    const avatar = slot.gender==='L' ? '♂' : '♀';
+    return `<div class="node ${personId?'filled':''}" data-slot="${slotId}">
+      <span class="avatar">${avatar}</span>
+      <span class="nname">${person ? person.name : '?'}</span>
+      <span class="nrole">${slot.role}</span>
+    </div>`;
+  };
+  const treeHtml = renderTreeHtml(nodeHtmlDeduksi);
+
+  const pool = poolNames();
+  const poolHtml = pool.length ? pool.map(id=>{
+    const p = PEOPLE[id];
+    return `<div class="pool-chip ${selectedName===id?'selected':''}" data-name="${id}">${p.name}</div>`;
+  }).join('') : `<span class="pool-empty">Semua nama sudah ditempatkan.</span>`;
+
+  let hint = hintOverride || 'Pilih nama dari daftar di bawah, lalu tap posisi kosong di pohon untuk menempatkannya.';
+  if (selectedName) hint = `Nama <b>${PEOPLE[selectedName].name}</b> dipilih — tap posisi kosong (atau posisi terisi untuk menukar) di pohon.`;
+
+  stage.innerHTML = `
+    ${treeHtml}
+    <div class="grid-hint">${hint}</div>
+    <div class="pool-wrap">
+      <div class="pool-label">Daftar nama (tap untuk pilih):</div>
+      <div class="pool-row" id="poolRow">${poolHtml}</div>
+    </div>
+    <button class="clue-toggle-btn" id="clueToggleBtn">📋 ${cluePanelOpen?'Tutup':'Buka'} Berkas Petunjuk (23 kartu)</button>
+    ${cluePanelOpen ? `<div class="clue-panel">${CLUES.map(c=>`<div class="clue-card ${c.hard?'hard':''}"><span class="ctitle">${c.title}</span>${c.text}</div>`).join('')}</div>` : ''}
+    <div class="feedback-box" id="feedbackBox"></div>
+    <button class="check-btn" id="checkBtn" ${filledCount<totalSlots ? 'disabled':''}>✔ CEK SUSUNAN SILSILAH</button>
+  `;
+
+  document.querySelectorAll('.pool-chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      selectedName = (selectedName === chip.dataset.name) ? null : chip.dataset.name;
+      renderDeduksi();
+    });
+  });
+  document.querySelectorAll('.node').forEach(node=>{
+    node.addEventListener('click', ()=> onNodeTap(node.dataset.slot));
+  });
+  document.getElementById('clueToggleBtn').addEventListener('click', ()=>{
+    cluePanelOpen = !cluePanelOpen;
+    renderDeduksi();
+  });
+  const checkBtn = document.getElementById('checkBtn');
+  if (checkBtn) checkBtn.addEventListener('click', checkDeduksi);
+}
+
+function onNodeTap(slotId){
+  const occupied = assignments[slotId];
+  if (selectedName){
+    assignments[slotId] = selectedName;
+    selectedName = null;
+    renderDeduksi();
+    return;
+  }
+  if (occupied){
+    delete assignments[slotId];
+    renderDeduksi();
+  }
+}
+
+function checkDeduksi(){
+  let allCorrect = true;
+  document.querySelectorAll('.node').forEach(node=>{
+    const slotId = node.dataset.slot;
+    const isCorrect = assignments[slotId] === SLOTS[slotId].correct;
+    node.classList.remove('correct','wrong');
+    node.classList.add(isCorrect ? 'correct' : 'wrong');
+    if (!isCorrect) allCorrect = false;
+  });
+  const fb = document.getElementById('feedbackBox');
+  fb.style.display = 'block';
+  if (allCorrect){
+    fb.innerHTML = `<b style="color:var(--mint)">✔ SILSILAH BENAR!</b> Semua identitas sudah cocok dengan data farmasi klinis. Lanjut ke Fase Memorize.`;
+    const checkBtn = document.getElementById('checkBtn');
+    checkBtn.textContent = '➜ LANJUT KE FASE MEMORIZE';
+    checkBtn.removeEventListener('click', checkDeduksi);
+    checkBtn.addEventListener('click', startMemorize);
+  } else {
+    wrongChecksDeduksi++;
+    const wrongCount = document.querySelectorAll('.node.wrong').length;
+    fb.innerHTML = `<b style="color:var(--alert)">✘ BELUM TEPAT</b> — ${wrongCount} posisi masih salah (ditandai merah). Posisi yang benar (hijau) boleh dibiarkan. Cocokkan ulang lewat kartu petunjuk lalu cek lagi.`;
+    document.getElementById('statusBar').innerHTML = `<span>Silsilah terisi: <b>${Object.keys(assignments).length}</b>/${Object.keys(SLOTS).length}</span><span>Cek salah: <b>${wrongChecksDeduksi}</b>x</span>`;
+  }
+}
+
+/* ============================================================ FASE 2: MEMORIZE */
+function startMemorize(){
+  setPhaseTag('FASE 2 · MEMORIZE');
+  clearInterval(gameTimer);
+  gameTimeLeft = GAME_TIME_SECONDS;
+  const badge = document.getElementById('gameTimerBadge');
+  badge.style.display = 'inline-block';
+  updateGameTimerBadge();
+  gameTimer = setInterval(()=>{
+    gameTimeLeft -= 1;
+    updateGameTimerBadge();
+    if (gameTimeLeft <= 0){ clearInterval(gameTimer); startRecall(0); }
+  }, 1000);
+  renderMemorize();
+}
+function formatGameTime(sec){ sec=Math.max(0,Math.ceil(sec)); const m=Math.floor(sec/60), s=sec%60; return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0'); }
+function updateGameTimerBadge(){
+  const badge = document.getElementById('gameTimerBadge');
+  if (!badge) return;
+  badge.textContent = '⏳ ' + formatGameTime(gameTimeLeft);
+  badge.classList.toggle('low', gameTimeLeft<=180);
+}
+
+function renderMemorize(){
+  document.getElementById('statusBar').innerHTML = `<span>Hafalkan seluruh silsilah &amp; data klinisnya</span>`;
+  const nodeHtmlMemorize = (slotId)=>{
+    const slot = SLOTS[slotId];
+    const person = PEOPLE[slot.correct];
+    const avatar = slot.gender==='L' ? '♂' : '♀';
+    return `<div class="node filled" data-slot="${slotId}">
+      <span class="avatar">${avatar}</span>
+      <span class="nname">${person.name}</span>
+      <span class="nrole">${slot.role}</span>
+    </div>`;
+  };
+  const treeHtml = renderTreeHtml(nodeHtmlMemorize);
+  stage.innerHTML = `
+    <div class="memorize-note">🧠 Tap salah satu anggota keluarga untuk membuka rekam klinisnya. Hafalkan nama, hubungan keluarga, dan data klinis sebanyak mungkin sebelum waktu habis atau kamu menekan lanjut.</div>
+    ${treeHtml}
+    <div class="dossier-box" id="dossierBox"></div>
+    <button class="advance-btn" id="advanceBtn">➜ SUDAH HAFAL, LANJUT KE RECALL</button>
+  `;
+  document.querySelectorAll('.node').forEach(node=>{
+    node.addEventListener('click', ()=>{
+      const slot = SLOTS[node.dataset.slot];
+      const person = PEOPLE[slot.correct];
+      const box = document.getElementById('dossierBox');
+      box.style.display = 'block';
+      box.innerHTML = `<span class="dname">${person.name} — ${slot.role}</span><ul>${person.clinis.map(c=>`<li>${c}</li>`).join('')}</ul>`;
+    });
+  });
+  document.getElementById('advanceBtn').addEventListener('click', ()=>{
+    const minutesLeft = Math.floor(gameTimeLeft/60);
+    memorizeBonus = minutesLeft;
+    clearInterval(gameTimer);
+    document.getElementById('gameTimerBadge').style.display = 'none';
+    startRecall(memorizeBonus);
+  });
+}
+
+/* ============================================================ FASE 3: RECALL */
+function startRecall(bonus){
+  memorizeBonus = bonus;
+  setPhaseTag('FASE 3 · RECALL');
+  recallIdx = 0; recallScore = 0; recallAnswered = 0;
+  renderRecallQuestion();
+}
+function renderRecallQuestion(){
+  const total = RECALL_QUESTIONS.length;
+  document.getElementById('statusBar').innerHTML = `<span>Soal <b>${recallIdx+1}</b>/${total}</span><span>Skor sementara: <b>${recallScore}</b></span>`;
+  const cur = RECALL_QUESTIONS[recallIdx];
+  stage.innerHTML = `
+    <div class="q-box">
+      <span class="qtag">SOAL RECALL — SILSILAH &amp; FARMASI KLINIS</span>
+      ${cur.q}
+    </div>
+    <div id="optWrap">${cur.options.map((o,k)=>`<button class="opt-btn" data-i="${k}"><span class="ol">${String.fromCharCode(65+k)}</span>${o}</button>`).join('')}</div>
+  `;
+  document.querySelectorAll('.opt-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> submitRecallAnswer(parseInt(btn.dataset.i)));
+  });
+}
+function submitRecallAnswer(choiceIdx){
+  const cur = RECALL_QUESTIONS[recallIdx];
+  document.querySelectorAll('.opt-btn').forEach((btn,i)=>{
+    btn.disabled = true;
+    if (i===cur.correct) btn.classList.add('correct');
+    else if (i===choiceIdx) btn.classList.add('wrong');
+  });
+  recallAnswered++;
+  if (choiceIdx === cur.correct) recallScore += 10;
+  setTimeout(()=>{
+    recallIdx++;
+    if (recallIdx < RECALL_QUESTIONS.length) renderRecallQuestion();
+    else renderResult();
+  }, 900);
+}
+
+/* ============================================================ HASIL AKHIR */
+function getRank(pct){
+  if (pct===100) return { label:'🏆 SEMPURNA!', color:'var(--mint)' };
+  if (pct>=90)   return { label:'⭐ LUAR BIASA', color:'var(--mint)' };
+  if (pct>=70)   return { label:'👍 BAGUS', color:'var(--cyan)' };
+  if (pct>=50)   return { label:'🙂 CUKUP', color:'var(--amber)' };
+  return { label:'💪 PERLU LATIHAN LAGI', color:'var(--alert)' };
+}
+function renderResult(){
+  setPhaseTag('HASIL AKHIR');
+  const correctCount = Math.round(recallScore/10);
+  const totalQ = RECALL_QUESTIONS.length;
+  const pct = Math.round((correctCount/totalQ)*100);
+  const penalty = wrongChecksDeduksi * 5;
+  const totalScore = Math.max(0, recallScore + memorizeBonus - penalty);
+  const rank = getRank(pct);
+
+  document.getElementById('statusBar').innerHTML = `<span>Tantangan selesai!</span>`;
+  stage.innerHTML = `
+    <div class="result-screen">
+      <div class="trophy">🧬</div>
+      <div class="result-title">SILSILAH KLINIS<br>SELESAI DITELUSURI!</div>
+      <div class="result-stats">
+        <div>Jawaban Recall benar: <b>${correctCount}</b>/${totalQ} (${pct}%)</div>
+        <div>Percobaan cek salah (Deduksi): <b>${wrongChecksDeduksi}</b>x</div>
+        <div>Bonus lanjut lebih awal (Memorize): <b>+${memorizeBonus}</b></div>
+        <hr style="border:none; border-top:1px solid #16233d; margin:8px 0;">
+        <div>Skor Recall (10/soal): <b>+${recallScore}</b></div>
+        <div>Bonus Memorize: <b>+${memorizeBonus}</b></div>
+        <div>Penalti cek salah (5/percobaan): <b>-${penalty}</b></div>
+        <div style="margin-top:8px; font-size:13px;">TOTAL SKOR: <b style="color:var(--amber); font-size:16px;">${totalScore}</b></div>
+        <div style="margin-top:4px;">Peringkat: <b style="color:${rank.color}">${rank.label}</b></div>
+      </div>
+      <button class="restart-btn" id="restartBtn">MAIN LAGI</button>
+    </div>
+  `;
+  document.getElementById('restartBtn').addEventListener('click', ()=>{
+    document.getElementById('gameTimerBadge').style.display = 'none';
+    shuffledPoolOrder = shuffleArr(Object.keys(PEOPLE));
+    renderIntro();
+  });
+}
+
+renderIntro();
+</script>
+
+</body>
+</html>
